@@ -308,9 +308,14 @@ local function get_ps_players(uid, cookie)
         return "AUTH_FAIL"
     end
     local servers = {}
-    -- parse "playing":N dan "maxPlayers":N berpasangan
-    for playing, maxp in r:gmatch('"playing":(%d+)%s*,%s*"maxPlayers":(%d+)') do
-        table.insert(servers, {playing=tonumber(playing), max=tonumber(maxp)})
+    -- parse maxPlayers dan playing (urutan bisa beda)
+    -- cari per-object: antara {} pairs
+    for block in r:gmatch('{[^{}]+}') do
+        local playing = block:match('"playing"%s*:%s*(%d+)')
+        local maxp = block:match('"maxPlayers"%s*:%s*(%d+)')
+        if playing and maxp then
+            table.insert(servers, {playing=tonumber(playing), max=tonumber(maxp)})
+        end
     end
     return servers
 end
