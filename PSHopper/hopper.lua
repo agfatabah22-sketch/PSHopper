@@ -304,7 +304,8 @@ local function get_ps_players(uid, cookie)
     local h = io.popen(cmd)
     if not h then return nil end
     local r = h:read("*a") or ""; h:close()
-    if r:match("401") or r:match("Unauthorized") or r:match("Authorization") then
+    if r:match('"message"%s*:%s*"Authorization has been denied') or
+       r:match('"code"%s*:%s*0%s*,%s*"message"') and r:match("denied") then
         return "AUTH_FAIL"
     end
     local servers = {}
