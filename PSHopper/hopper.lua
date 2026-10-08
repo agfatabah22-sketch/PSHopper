@@ -321,29 +321,34 @@ local function get_ps_players(uid, cookie)
     return servers
 end
 
--- Cek player count per link PS
--- return: {link_index=, placeId=, playing=, max=, status=}
+-- Cek SEMUA VipServer per placeId
+-- return: {servers={playing,max}, total, full, empty, status}
 local function check_all_servers(ps_list, cookie)
     local results = {}
     if not cookie then return results end
+    -- kumpulkan unique placeId
+    local done_pid = {}
     for i, link in ipairs(ps_list) do
         local pid = extract_place_id(link)
-        local playing, maxp, status = nil, nil, "NO_DATA"
-        if pid then
-            -- VipServer API pakai placeId langsung, bukan universeId
+        if pid and not done_pid[pid] then
+            done_pid[pid] = true
             local sv = get_ps_players(pid, cookie)
             if sv == "AUTH_FAIL" then
-                status = "AUTH_FAIL"
+                table.insert(results, {placeId=pid, servers={}, total=0, full=0, empty=0, status="AUTH_FAIL"})
             elseif sv and #sv > 0 then
-                -- ambil server pertama yang cocok dengan game ini
-                playing = sv[1].playing
-                maxp = sv[1].max
-                status = "OK"
+                local full_count, empty_count = 0, 0
+                for _, s in ipairs(sv) do
+                    if s.playing >= TARGET_ALTS then full_count = full_count + 1
+                    elseif s.playing == 0 then empty_count = empty_count + 1 end
+                end
+                table.insert(results, {
+                    placeId=pid, servers=sv, total=#sv,
+                    full=full_count, empty=empty_count, status="OK"
+                })
+            else
+                table.insert(results, {placeId=pid, servers={}, total=0, full=0, empty=0, status="NO_DATA"})
             end
         end
-        table.insert(results, {
-            link_index=i, placeId=pid, playing=playing, max=maxp, status=status
-        })
     end
     return results
 end
@@ -647,23 +652,36 @@ local function menu_check_status()
     if not ps_list or #ps_list == 0 then
         color("31"); print("Tidak ada link PS!"); noreset(); print(""); ask("Enter"); return
     end
-    color("36"); print("Cek "..#ps_list.." server..."); noreset(); print("")
+    color("36"); print("Mengambil data dari API..."); noreset(); print("")
     local results = check_all_servers(ps_list, cookie)
-    color("32"); print(" PS#  Players    Status"); noreset()
-    print(string.rep("-",W))
-    for i, r in ipairs(results) do
+    for _, r in ipairs(results) do
         if r.status == "AUTH_FAIL" then
-            color("31"); print(string.format(" %-3d  %-9s  Cookie invalid/expired", i, "-"))
+            color("31"); print("Game "..tostring(r.placeId)..": Cookie invalid/expired"); noreset()
         elseif r.status == "NO_DATA" then
-            color("90"); print(string.format(" %-3d  %-9s  Tidak ada data", i, "-"))
-        elseif r.playing and r.playing >= TARGET_ALTS then
-            color("32"); print(string.format(" %-3d  %-9s  FULL", i, r.playing.."/"..(r.max or "?")))
+            color("90"); print("Game "..tostring(r.placeId)..": Tidak ada PS data"); noreset()
         else
-            color("33"); print(string.format(" %-3d  %-9s  Kurang "..(TARGET_ALTS-(r.playing or 0)).." alt", i, (r.playing or 0).."/"..(r.max or "?")))
+            color("36"); print("Game: "..tostring(r.placeId)); noreset()
+            color("36"); print("Total PS: "..r.total.." | Full(>="..TARGET_ALTS.."): "..r.full.." | Kosong: "..r.empty); noreset()
+            print("")
+            color("32"); print(" SV#  Players    Status"); noreset()
+            print(string.rep("-",W))
+            for si, sv in ipairs(r.servers) do
+                local ptxt = sv.playing.."/"..sv.max
+                if sv.playing >= sv.max then
+                    color("32"); print(string.format(" %-3d  %-9s  FULL (max)", si, ptxt))
+                elseif sv.playing >= TARGET_ALTS then
+                    color("32"); print(string.format(" %-3d  %-9s  OK (>=%d alt)", si, ptxt, TARGET_ALTS))
+                elseif sv.playing > 0 then
+                    color("33"); print(string.format(" %-3d  %-9s  Kurang %d alt", si, ptxt, TARGET_ALTS-sv.playing))
+                else
+                    color("90"); print(string.format(" %-3d  %-9s  Kosong", si, ptxt))
+                end
+                noreset()
+            end
         end
-        noreset()
+        print(string.rep("-",W))
     end
-    print(""); border(); print(""); ask("Enter")
+    print(""); ask("Enter")
 end
 
 -- ============================================================
