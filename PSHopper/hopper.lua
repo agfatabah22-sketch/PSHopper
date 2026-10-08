@@ -321,7 +321,7 @@ local function get_ps_players(uid, cookie)
 end
 
 -- Cek player count per link PS
--- return: {link_index=, placeId=, universeId=, playing=, max=, status=}
+-- return: {link_index=, placeId=, playing=, max=, status=}
 local function check_all_servers(ps_list, cookie)
     local results = {}
     if not cookie then return results end
@@ -329,17 +329,15 @@ local function check_all_servers(ps_list, cookie)
         local pid = extract_place_id(link)
         local playing, maxp, status = nil, nil, "NO_DATA"
         if pid then
-            local uid = get_universe_id(pid)
-            if uid then
-                local sv = get_ps_players(uid, cookie)
-                if sv == "AUTH_FAIL" then
-                    status = "AUTH_FAIL"
-                elseif sv and #sv > 0 then
-                    -- ambil server pertama yang cocok dengan game ini
-                    playing = sv[1].playing
-                    maxp = sv[1].max
-                    status = "OK"
-                end
+            -- VipServer API pakai placeId langsung, bukan universeId
+            local sv = get_ps_players(pid, cookie)
+            if sv == "AUTH_FAIL" then
+                status = "AUTH_FAIL"
+            elseif sv and #sv > 0 then
+                -- ambil server pertama yang cocok dengan game ini
+                playing = sv[1].playing
+                maxp = sv[1].max
+                status = "OK"
             end
         end
         table.insert(results, {
